@@ -169,21 +169,55 @@ impl LoadBalancer {
     /// Get statistics about current load distribution
     pub fn get_load_statistics(&self) -> LoadStatistics {
         let loads: Vec<f64> = self.node_loads.values().copied().collect();
-        
+
+        if loads.is_empty() {
+            return LoadStatistics {
+                min_load: 0.0,
+                max_load: 0.0,
+                avg_load: 0.0,
+                std_dev: 0.0,
+                num_nodes: 0,
+            };
+        }
+
         let min_load = loads.iter().copied().fold(f64::INFINITY, f64::min);
         let max_load = loads.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-        let avg_load = if loads.is_empty() {
-            0.0
-        } else {
-            loads.iter().sum::<f64>() / loads.len() as f64
-        };
+        let avg_load = loads.iter().sum::<f64>() / loads.len() as f64;
+
+        // Calculate standard deviation
+        let variance = loads.iter()
+            .map(|load| {
+                let diff = load - avg_load;
+                diff * diff
+            })
+            .sum::<f64>() / loads.len() as f64;
+        let std_dev = variance.sqrt();
 
         LoadStatistics {
             min_load,
             max_load,
             avg_load,
+            std_dev,
             num_nodes: self.node_loads.len(),
         }
+    }
+
+    /// Get overloaded nodes (load > threshold)
+    pub fn get_overloaded_nodes(&self, threshold: f64) -> Vec<NodeId> {
+        self.node_loads
+            .iter()
+            .filter(|(_, &load)| load > threshold)
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// Get underloaded nodes (load < threshold)
+    pub fn get_underloaded_nodes(&self, threshold: f64) -> Vec<NodeId> {
+        self.node_loads
+            .iter()
+            .filter(|(_, &load)| load < threshold)
+            .map(|(id, _)| *id)
+            .collect()
     }
 }
 
@@ -199,6 +233,7 @@ pub struct LoadStatistics {
     pub min_load: f64,
     pub max_load: f64,
     pub avg_load: f64,
+    pub std_dev: f64,
     pub num_nodes: usize,
 }
 
@@ -210,6 +245,20 @@ impl LoadStatistics {
         } else {
             (self.max_load - self.min_load) / self.avg_load
         }
+    }
+
+    /// Calculate coefficient of variation (std_dev / mean)
+    pub fn coefficient_of_variation(&self) -> f64 {
+        if self.avg_load == 0.0 {
+            0.0
+        } else {
+            self.std_dev / self.avg_load
+        }
+    }
+
+    /// Check if load is well-balanced (CV < threshold)
+    pub fn is_well_balanced(&self, threshold: f64) -> bool {
+        self.coefficient_of_variation() < threshold
     }
 }
 

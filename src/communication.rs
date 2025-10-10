@@ -1,7 +1,9 @@
 use crate::node::NodeId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::time::timeout;
 
 /// Types of messages exchanged between nodes
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,17 +69,27 @@ pub struct CommunicationLayer {
     message_rx: mpsc::UnboundedReceiver<Message>,
     /// Message handlers for different message types
     handlers: HashMap<String, Box<dyn Fn(&Message) + Send + Sync>>,
+    /// Default timeout for operations
+    default_timeout: Duration,
+    /// Maximum retry attempts
+    max_retries: u32,
 }
 
 impl CommunicationLayer {
     pub fn new(node_id: NodeId) -> Self {
+        Self::with_config(node_id, Duration::from_secs(30), 3)
+    }
+
+    pub fn with_config(node_id: NodeId, default_timeout: Duration, max_retries: u32) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        
+
         Self {
             node_id,
             message_tx: tx,
             message_rx: rx,
             handlers: HashMap::new(),
+            default_timeout,
+            max_retries,
         }
     }
 
@@ -97,6 +109,35 @@ impl CommunicationLayer {
     /// Receive a message (non-blocking)
     pub async fn receive_message(&mut self) -> Option<Message> {
         self.message_rx.recv().await
+    }
+
+    /// Receive a message with timeout
+    pub async fn receive_message_timeout(&mut self, duration: Duration) -> Result<Message, CommunicationError> {
+        timeout(duration, self.message_rx.recv())
+            .await
+            .map_err(|_| CommunicationError::Timeout)?
+            .ok_or(CommunicationError::ReceiveFailed)
+    }
+
+    /// Send a message with retry logic
+    pub async fn send_message_with_retry(&self, message: Message) -> Result<(), CommunicationError> {
+        let mut attempts = 0;
+        let mut last_error = None;
+
+        while attempts < self.max_retries {
+            match self.send_message(message.clone()).await {
+                Ok(_) => return Ok(()),
+                Err(e) => {
+                    last_error = Some(e);
+                    attempts += 1;
+                    if attempts < self.max_retries {
+                        tokio::time::sleep(Duration::from_millis(100 * attempts as u64)).await;
+                    }
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or(CommunicationError::SendFailed))
     }
 
     /// Broadcast a message to multiple nodes
@@ -131,6 +172,10 @@ pub enum CommunicationError {
     DeserializationFailed,
     #[error("Network error: {0}")]
     NetworkError(String),
+    #[error("Operation timed out")]
+    Timeout,
+    #[error("Maximum retries exceeded")]
+    MaxRetriesExceeded,
 }
 
 /// Manages communication between multiple nodes

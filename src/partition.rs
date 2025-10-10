@@ -40,11 +40,33 @@ pub struct PartitionManager {
 }
 
 impl PartitionManager {
-    pub fn new(config: PartitionConfig) -> Self {
-        Self {
+    pub fn new(config: PartitionConfig) -> Result<Self, PartitionError> {
+        if config.num_layers == 0 {
+            return Err(PartitionError::InvalidConfig("Number of layers must be positive".to_string()));
+        }
+        if config.num_nodes == 0 {
+            return Err(PartitionError::InvalidConfig("Number of nodes must be positive".to_string()));
+        }
+
+        Ok(Self {
             config,
             partitions: HashMap::new(),
-        }
+        })
+    }
+
+    /// Get the configuration
+    pub fn config(&self) -> &PartitionConfig {
+        &self.config
+    }
+
+    /// Get total number of partitioned layers
+    pub fn total_partitioned_layers(&self) -> usize {
+        self.partitions.len()
+    }
+
+    /// Check if all layers are partitioned
+    pub fn is_fully_partitioned(&self) -> bool {
+        self.partitions.len() == self.config.num_layers
     }
 
     /// Partition layers across nodes based on their capabilities
@@ -189,6 +211,10 @@ pub enum PartitionError {
     InvalidCapabilities,
     #[error("Layer {0} not found")]
     LayerNotFound(usize),
+    #[error("Invalid configuration: {0}")]
+    InvalidConfig(String),
+    #[error("Partitioning conflict: {0}")]
+    PartitionConflict(String),
 }
 
 #[cfg(test)]
@@ -204,7 +230,7 @@ mod tests {
             num_nodes: 3,
         };
 
-        let mut manager = PartitionManager::new(config);
+        let mut manager = PartitionManager::new(config).unwrap();
         
         let nodes = vec![
             (NodeId::new(), NodeCapability {
@@ -245,7 +271,7 @@ mod tests {
             num_nodes: 2,
         };
 
-        let mut manager = PartitionManager::new(config);
+        let mut manager = PartitionManager::new(config).unwrap();
         
         let nodes = vec![
             (NodeId::new(), NodeCapability {

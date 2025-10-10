@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use uuid::Uuid;
 
 /// Unique identifier for a node in the distributed system
@@ -10,11 +11,27 @@ impl NodeId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
+
+    /// Create a NodeId from a UUID
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    /// Get the inner UUID
+    pub fn as_uuid(&self) -> &Uuid {
+        &self.0
+    }
 }
 
 impl Default for NodeId {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Display for NodeId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -34,16 +51,56 @@ pub struct NodeCapability {
 }
 
 impl NodeCapability {
+    /// Create a new NodeCapability with validation
+    pub fn new(
+        memory_gb: f64,
+        compute_flops: f64,
+        network_bandwidth_gbps: f64,
+        num_devices: usize,
+        device_type: String,
+    ) -> Result<Self, NodeError> {
+        if memory_gb <= 0.0 {
+            return Err(NodeError::InvalidCapability("Memory must be positive".to_string()));
+        }
+        if compute_flops <= 0.0 {
+            return Err(NodeError::InvalidCapability("Compute FLOPS must be positive".to_string()));
+        }
+        if network_bandwidth_gbps <= 0.0 {
+            return Err(NodeError::InvalidCapability("Network bandwidth must be positive".to_string()));
+        }
+        if num_devices == 0 {
+            return Err(NodeError::InvalidCapability("Must have at least one device".to_string()));
+        }
+
+        Ok(Self {
+            memory_gb,
+            compute_flops,
+            network_bandwidth_gbps,
+            num_devices,
+            device_type,
+        })
+    }
+
     /// Calculate a relative performance score for load balancing
     pub fn performance_score(&self) -> f64 {
         // Weighted score based on memory, compute, and bandwidth
         let memory_weight = 0.3;
         let compute_weight = 0.5;
         let bandwidth_weight = 0.2;
-        
-        (self.memory_gb * memory_weight) + 
-        (self.compute_flops / 1e12 * compute_weight) + 
+
+        (self.memory_gb * memory_weight) +
+        (self.compute_flops / 1e12 * compute_weight) +
         (self.network_bandwidth_gbps * bandwidth_weight)
+    }
+
+    /// Get memory per device
+    pub fn memory_per_device(&self) -> f64 {
+        self.memory_gb / self.num_devices as f64
+    }
+
+    /// Get compute per device
+    pub fn compute_per_device(&self) -> f64 {
+        self.compute_flops / self.num_devices as f64
     }
 }
 
@@ -135,6 +192,16 @@ impl Default for NodeRegistry {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum NodeError {
+    #[error("Invalid node capability: {0}")]
+    InvalidCapability(String),
+    #[error("Node not found")]
+    NodeNotFound,
+    #[error("Node already exists")]
+    NodeAlreadyExists,
 }
 
 #[cfg(test)]

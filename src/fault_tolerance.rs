@@ -50,6 +50,21 @@ impl HealthInfo {
     pub fn is_healthy(&self, timeout: Duration) -> bool {
         self.last_heartbeat.elapsed() < timeout && self.status != NodeStatus::Failed
     }
+
+    /// Get time since last heartbeat
+    pub fn time_since_heartbeat(&self) -> Duration {
+        self.last_heartbeat.elapsed()
+    }
+
+    /// Check if node is degraded
+    pub fn is_degraded(&self) -> bool {
+        self.status == NodeStatus::Degraded
+    }
+
+    /// Check if node has failed
+    pub fn has_failed(&self) -> bool {
+        self.status == NodeStatus::Failed
+    }
 }
 
 /// Monitors the health of nodes in the distributed system
@@ -124,9 +139,47 @@ impl HealthMonitor {
             .collect()
     }
 
+    /// Get all degraded nodes
+    pub fn degraded_nodes(&self) -> Vec<NodeId> {
+        self.health_info
+            .iter()
+            .filter(|(_, info)| info.status == NodeStatus::Degraded)
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// Get all failed nodes
+    pub fn failed_nodes(&self) -> Vec<NodeId> {
+        self.health_info
+            .iter()
+            .filter(|(_, info)| info.status == NodeStatus::Failed)
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
     /// Remove a failed node from monitoring
     pub fn remove_node(&mut self, node_id: &NodeId) {
         self.health_info.remove(node_id);
+    }
+
+    /// Get health information for a specific node
+    pub fn get_health_info(&self, node_id: &NodeId) -> Option<&HealthInfo> {
+        self.health_info.get(node_id)
+    }
+
+    /// Get total number of monitored nodes
+    pub fn total_nodes(&self) -> usize {
+        self.health_info.len()
+    }
+
+    /// Calculate cluster health percentage
+    pub fn cluster_health_percentage(&self) -> f64 {
+        if self.health_info.is_empty() {
+            return 100.0;
+        }
+
+        let healthy_count = self.healthy_nodes().len();
+        (healthy_count as f64 / self.health_info.len() as f64) * 100.0
     }
 
     /// Start periodic health checking

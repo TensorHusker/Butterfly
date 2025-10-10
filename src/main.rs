@@ -70,7 +70,8 @@ fn main() {
     println!("Total Layers: {}", config.num_layers);
 
     // Create partition manager and distribute layers
-    let mut partition_manager = PartitionManager::new(config);
+    let mut partition_manager = PartitionManager::new(config)
+        .expect("Failed to create partition manager");
     
     let node_capabilities = vec![
         (node1_id, NodeCapability {
@@ -128,7 +129,9 @@ fn main() {
     println!("  Average Load: {:.2}%", stats.avg_load * 100.0);
     println!("  Min Load: {:.2}%", stats.min_load * 100.0);
     println!("  Max Load: {:.2}%", stats.max_load * 100.0);
+    println!("  Standard Deviation: {:.3}", stats.std_dev);
     println!("  Imbalance Factor: {:.3}", stats.imbalance_factor());
+    println!("  Coefficient of Variation: {:.3}", stats.coefficient_of_variation());
 
     // Initialize health monitor
     let health_monitor = HealthMonitor::new(
