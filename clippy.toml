@@ -1,0 +1,61 @@
+# Butterfly Clippy Configuration
+# Strict linting for distributed systems: async safety, thread safety, performance
+
+# Cognitive complexity threshold for functions
+cognitive-complexity-threshold = 30
+
+# Documentation requirements
+missing-docs-in-crate-items = true
+
+# Enum variant name length
+enum-variant-name-threshold = 3
+
+# Type complexity threshold
+type-complexity-threshold = 250
+
+# Performance lints
+too-many-arguments-threshold = 7
+too-many-lines-threshold = 150
+
+# Vec initialization capacity
+vec-box-size-threshold = 4096
+
+# String lints
+max-trait-bounds = 5
+max-struct-bools = 3
+
+# Async safety (critical for distributed systems)
+# Enable via #![warn(...)] in lib.rs:
+# - clippy::await_holding_lock
+# - clippy::await_holding_refcell_ref
+# - clippy::async_yields_async
+
+# Thread safety (critical for distributed systems)
+# Enable via #![warn(...)] in lib.rs:
+# - clippy::mutex_atomic
+# - clippy::mutex_integer
+# - clippy::arc_with_non_send_sync
+
+# Performance (critical for inference workloads)
+# Enable via #![warn(...)] in lib.rs:
+# - clippy::large_stack_arrays
+# - clippy::large_types_passed_by_value
+# - clippy::needless_pass_by_value
+# - clippy::trivially_copy_pass_by_ref
+# - clippy::clone_on_ref_ptr
+# - clippy::inefficient_to_string
+# - clippy::unnecessary_wraps
+
+# Error handling
+# Enable via #![warn(...)] in lib.rs:
+# - clippy::unwrap_used
+# - clippy::expect_used
+# - clippy::panic
+# - clippy::todo
+# - clippy::unimplemented
+
+# Correctness (always critical)
+# Enable via #![warn(...)] in lib.rs:
+# - clippy::missing_errors_doc
+# - clippy::missing_panics_doc
+# - clippy::missing_safety_doc
