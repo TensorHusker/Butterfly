@@ -1,0 +1,495 @@
+{
+  "dashboard": {
+    "title": "Butterfly Overview",
+    "tags": ["butterfly", "overview"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["10s", "30s", "1m", "5m"],
+      "time_options": ["5m", "15m", "1h", "6h", "24h", "7d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "cluster",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(butterfly_requests_total, cluster)",
+          "multi": false,
+          "includeAll": true,
+          "refresh": 1
+        },
+        {
+          "name": "interval",
+          "type": "interval",
+          "query": "1m,5m,10m,30m,1h",
+          "current": {
+            "text": "5m",
+            "value": "5m"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "expr": "changes(butterfly_build_info[5m]) > 0",
+          "tagKeys": "version",
+          "titleFormat": "Deployment",
+          "textFormat": "Version {{version}}"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cluster Status",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "butterfly_cluster_size{state=\"active\",cluster=\"$cluster\"}",
+            "legendFormat": "Active Nodes"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 3, "color": "yellow"},
+                {"value": 10, "color": "green"}
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "stat",
+        "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(butterfly_requests_total{cluster=\"$cluster\"}[$interval]))",
+            "legendFormat": "Requests/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(butterfly_request_errors_total{cluster=\"$cluster\"}[$interval])) / sum(rate(butterfly_requests_total{cluster=\"$cluster\"}[$interval]))",
+            "legendFormat": "Error %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.01, "color": "yellow"},
+                {"value": 0.05, "color": "red"}
+              ]
+            },
+            "unit": "percentunit",
+            "decimals": 3
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value"
+        }
+      },
+      {
+        "id": 4,
+        "title": "P99 Latency",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(butterfly_request_duration_seconds_bucket{cluster=\"$cluster\"}[$interval])) by (le))",
+            "legendFormat": "P99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            },
+            "unit": "s",
+            "decimals": 3
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Throughput",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(butterfly_tokens_processed_total{cluster=\"$cluster\"}[$interval]))",
+            "legendFormat": "Tokens/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Byzantine Faults",
+        "type": "stat",
+        "gridPos": {"x": 20, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(butterfly_byzantine_faults_detected_total{cluster=\"$cluster\"}[$interval]))",
+            "legendFormat": "Faults/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.001, "color": "yellow"},
+                {"value": 0.01, "color": "red"}
+              ]
+            },
+            "unit": "short",
+            "decimals": 4
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Request Rate Over Time",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(butterfly_requests_total{cluster=\"$cluster\"}[$interval]))",
+            "legendFormat": "Total"
+          },
+          {
+            "expr": "sum(rate(butterfly_requests_total{cluster=\"$cluster\",status=\"success\"}[$interval]))",
+            "legendFormat": "Success"
+          },
+          {
+            "expr": "sum(rate(butterfly_requests_total{cluster=\"$cluster\",status=\"error\"}[$interval]))",
+            "legendFormat": "Error"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Error"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max"]
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Latency Percentiles",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(butterfly_request_duration_seconds_bucket{cluster=\"$cluster\"}[$interval])) by (le))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(butterfly_request_duration_seconds_bucket{cluster=\"$cluster\"}[$interval])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(butterfly_request_duration_seconds_bucket{cluster=\"$cluster\"}[$interval])) by (le))",
+            "legendFormat": "P99"
+          },
+          {
+            "expr": "histogram_quantile(0.999, sum(rate(butterfly_request_duration_seconds_bucket{cluster=\"$cluster\"}[$interval])) by (le))",
+            "legendFormat": "P99.9"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max"]
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Layer Execution Time (P99)",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "topk(10, histogram_quantile(0.99, sum(rate(butterfly_layer_compute_duration_seconds_bucket{cluster=\"$cluster\"}[$interval])) by (layer_id, le)))",
+            "legendFormat": "Layer {{layer_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max"]
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Node Resource Utilization",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "avg(butterfly_cpu_usage_ratio{cluster=\"$cluster\"})",
+            "legendFormat": "CPU Avg"
+          },
+          {
+            "expr": "avg(butterfly_gpu_utilization_ratio{cluster=\"$cluster\"})",
+            "legendFormat": "GPU Avg"
+          },
+          {
+            "expr": "avg(butterfly_memory_allocated_bytes{cluster=\"$cluster\"}) / avg(butterfly_memory_peak_bytes{cluster=\"$cluster\"})",
+            "legendFormat": "Memory Avg"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max"]
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Network Bandwidth",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(butterfly_network_bytes_sent{cluster=\"$cluster\"}[$interval]))",
+            "legendFormat": "Sent"
+          },
+          {
+            "expr": "sum(rate(butterfly_network_bytes_received{cluster=\"$cluster\"}[$interval]))",
+            "legendFormat": "Received"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Bps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max"]
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Consensus Health",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "max(butterfly_consensus_log_entries_total{cluster=\"$cluster\"}) - min(butterfly_consensus_commit_index{cluster=\"$cluster\"})",
+            "legendFormat": "Commit Lag"
+          },
+          {
+            "expr": "rate(butterfly_consensus_leader_changes_total{cluster=\"$cluster\"}[1h]) * 3600",
+            "legendFormat": "Leader Changes/hour"
+          },
+          {
+            "expr": "rate(butterfly_consensus_heartbeat_failures_total{cluster=\"$cluster\"}[$interval])",
+            "legendFormat": "Heartbeat Failures/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max"]
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "Top 10 Nodes by Request Count",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "topk(10, sum(rate(butterfly_requests_total{cluster=\"$cluster\"}[$interval])) by (node_id))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true},
+              "indexByName": {"node_id": 0, "Value": 1},
+              "renameByName": {"Value": "Requests/sec"}
+            }
+          }
+        ],
+        "options": {
+          "sortBy": [
+            {
+              "displayName": "Requests/sec",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 14,
+        "title": "Error Breakdown",
+        "type": "piechart",
+        "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(butterfly_request_errors_total{cluster=\"$cluster\"}[$interval])) by (error_type)",
+            "legendFormat": "{{error_type}}"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "donut"
+        }
+      }
+    ]
+  }
+}

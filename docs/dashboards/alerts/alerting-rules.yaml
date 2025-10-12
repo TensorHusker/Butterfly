@@ -1,0 +1,410 @@
+# Butterfly Alerting Rules
+# These rules define alerts for critical system conditions
+
+groups:
+  - name: butterfly_requests
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(butterfly_request_errors_total[5m]))
+          / sum(rate(butterfly_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/high-error-rate"
+
+      # Critical error rate
+      - alert: CriticalErrorRate
+        expr: |
+          sum(rate(butterfly_request_errors_total[5m]))
+          / sum(rate(butterfly_requests_total[5m])) > 0.25
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "CRITICAL: Very high error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 25%)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/critical-error-rate"
+
+      # High latency
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(butterfly_request_duration_seconds_bucket[5m])) by (le)
+          ) > 5.0
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High P99 latency detected"
+          description: "P99 latency is {{ $value }}s (threshold: 5s)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/high-latency"
+
+      # Very high latency
+      - alert: VeryHighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(butterfly_request_duration_seconds_bucket[5m])) by (le)
+          ) > 30.0
+        for: 2m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "CRITICAL: Very high latency"
+          description: "P99 latency is {{ $value }}s (threshold: 30s)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/very-high-latency"
+
+  - name: butterfly_consensus
+    interval: 30s
+    rules:
+      # Cluster below quorum
+      - alert: ClusterBelowQuorum
+        expr: |
+          butterfly_cluster_size{state="active"}
+          < butterfly_quorum_size
+        for: 1m
+        labels:
+          severity: critical
+          component: consensus
+        annotations:
+          summary: "Cluster size below quorum"
+          description: "Only {{ $value }} active nodes (need {{ $labels.butterfly_quorum_size }} for quorum)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/below-quorum"
+
+      # Frequent leader changes
+      - alert: FrequentLeaderChanges
+        expr: |
+          rate(butterfly_consensus_leader_changes_total[1h]) * 3600 > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: consensus
+        annotations:
+          summary: "Frequent leader changes detected"
+          description: "{{ $value }} leader changes per hour (threshold: 5)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/leader-instability"
+
+      # Consensus stalled
+      - alert: ConsensusStalled
+        expr: |
+          max(butterfly_consensus_log_entries_total)
+          - min(butterfly_consensus_commit_index) > 100
+        for: 5m
+        labels:
+          severity: critical
+          component: consensus
+        annotations:
+          summary: "Consensus commit lag detected"
+          description: "Commit lag is {{ $value }} entries (threshold: 100)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/consensus-stalled"
+
+      # Heartbeat failures
+      - alert: HeartbeatFailures
+        expr: |
+          rate(butterfly_consensus_heartbeat_failures_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: consensus
+        annotations:
+          summary: "Heartbeat failures detected"
+          description: "Heartbeat failure rate: {{ $value }}/sec"
+          runbook_url: "https://docs.butterfly.ai/runbooks/heartbeat-failures"
+
+  - name: butterfly_byzantine
+    interval: 30s
+    rules:
+      # Byzantine fault detected
+      - alert: ByzantineFaultDetected
+        expr: |
+          rate(butterfly_byzantine_faults_detected_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Byzantine fault detected"
+          description: "Fault detection rate: {{ $value }}/sec on {{ $labels.node_id }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/byzantine-fault"
+
+      # High verification failure rate
+      - alert: HighVerificationFailureRate
+        expr: |
+          rate(butterfly_verification_failures_total[5m])
+          / rate(butterfly_verification_checks_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High verification failure rate"
+          description: "Verification failure rate: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/verification-failures"
+
+      # Low reputation node
+      - alert: LowReputationNode
+        expr: |
+          butterfly_reputation_score < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Node has low reputation score"
+          description: "{{ $labels.node_id }} reputation: {{ $value }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/low-reputation"
+
+  - name: butterfly_resources
+    interval: 30s
+    rules:
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          sum(butterfly_memory_allocated_bytes) by (node_id)
+          / sum(butterfly_memory_peak_bytes) by (node_id) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage on {{ $labels.node_id }}"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/high-memory"
+
+      # Critical memory usage
+      - alert: CriticalMemoryUsage
+        expr: |
+          sum(butterfly_memory_allocated_bytes) by (node_id)
+          / sum(butterfly_memory_peak_bytes) by (node_id) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          component: resources
+        annotations:
+          summary: "CRITICAL: Memory exhaustion on {{ $labels.node_id }}"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/memory-exhaustion"
+
+      # GPU overheating
+      - alert: GPUOverheating
+        expr: |
+          butterfly_gpu_temperature_celsius > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: hardware
+        annotations:
+          summary: "GPU overheating on {{ $labels.node_id }}"
+          description: "GPU {{ $labels.gpu_id }} temperature is {{ $value }}°C"
+          runbook_url: "https://docs.butterfly.ai/runbooks/gpu-overheating"
+
+      # Critical GPU temperature
+      - alert: CriticalGPUTemperature
+        expr: |
+          butterfly_gpu_temperature_celsius > 90
+        for: 1m
+        labels:
+          severity: critical
+          component: hardware
+        annotations:
+          summary: "CRITICAL: GPU critical temperature"
+          description: "GPU {{ $labels.gpu_id }} temperature is {{ $value }}°C"
+          runbook_url: "https://docs.butterfly.ai/runbooks/gpu-critical-temp"
+
+      # Low disk space
+      - alert: LowDiskSpace
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "Low disk space on {{ $labels.node_id }}"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+          runbook_url: "https://docs.butterfly.ai/runbooks/low-disk-space"
+
+  - name: butterfly_network
+    interval: 30s
+    rules:
+      # Network partition
+      - alert: NetworkPartition
+        expr: |
+          butterfly_connection_active == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: network
+        annotations:
+          summary: "Network partition detected"
+          description: "Connection from {{ $labels.from_node }} to {{ $labels.to_node }} is down"
+          runbook_url: "https://docs.butterfly.ai/runbooks/network-partition"
+
+      # High packet loss
+      - alert: HighPacketLoss
+        expr: |
+          butterfly_quic_packet_loss_ratio > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High packet loss detected"
+          description: "Packet loss between {{ $labels.from_node }} and {{ $labels.to_node }}: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/packet-loss"
+
+      # High network latency
+      - alert: HighNetworkLatency
+        expr: |
+          histogram_quantile(0.99,
+            rate(butterfly_connection_latency_seconds_bucket[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High network latency"
+          description: "P99 latency between {{ $labels.from_node }} and {{ $labels.to_node }}: {{ $value }}s"
+          runbook_url: "https://docs.butterfly.ai/runbooks/network-latency"
+
+      # Connection errors
+      - alert: HighConnectionErrorRate
+        expr: |
+          rate(butterfly_connection_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High connection error rate"
+          description: "Connection error rate: {{ $value }}/sec ({{ $labels.error_type }})"
+          runbook_url: "https://docs.butterfly.ai/runbooks/connection-errors"
+
+  - name: butterfly_checkpoints
+    interval: 30s
+    rules:
+      # Checkpoint verification failures
+      - alert: CheckpointVerificationFailures
+        expr: |
+          rate(butterfly_checkpoint_count{status="failed"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "Checkpoint verification failures"
+          description: "Checkpoint failure rate: {{ $value }}/sec on {{ $labels.node_id }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/checkpoint-failures"
+
+      # Slow checkpoint creation
+      - alert: SlowCheckpointCreation
+        expr: |
+          histogram_quantile(0.99,
+            rate(butterfly_checkpoint_duration_seconds_bucket{phase="write"}[5m])
+          ) > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "Slow checkpoint creation"
+          description: "P99 checkpoint write time: {{ $value }}s (threshold: 300s)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/slow-checkpoints"
+
+      # Disk I/O errors
+      - alert: DiskIOErrors
+        expr: |
+          rate(butterfly_disk_io_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          component: storage
+        annotations:
+          summary: "Disk I/O errors detected"
+          description: "I/O error rate: {{ $value }}/sec on {{ $labels.node_id }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/disk-errors"
+
+  - name: butterfly_coordination
+    interval: 30s
+    rules:
+      # Queue buildup
+      - alert: TaskQueueBuildup
+        expr: |
+          butterfly_tasks_queued > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: coordination
+        annotations:
+          summary: "Task queue buildup on {{ $labels.node_id }}"
+          description: "{{ $value }} tasks queued (threshold: 100)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/queue-buildup"
+
+      # Critical queue size
+      - alert: CriticalQueueSize
+        expr: |
+          butterfly_tasks_queued > 1000
+        for: 2m
+        labels:
+          severity: critical
+          component: coordination
+        annotations:
+          summary: "CRITICAL: Very large task queue"
+          description: "{{ $value }} tasks queued on {{ $labels.node_id }}"
+          runbook_url: "https://docs.butterfly.ai/runbooks/critical-queue"
+
+      # High task reassignment rate
+      - alert: HighTaskReassignmentRate
+        expr: |
+          rate(butterfly_task_reassignments_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: coordination
+        annotations:
+          summary: "High task reassignment rate"
+          description: "Reassignment rate: {{ $value }}/sec (reason: {{ $labels.reason }})"
+          runbook_url: "https://docs.butterfly.ai/runbooks/reassignments"
+
+  - name: butterfly_slo
+    interval: 5m
+    rules:
+      # SLO: 99.9% availability over 7 days
+      - alert: AvailabilitySLOBreach
+        expr: |
+          (sum(rate(butterfly_requests_total{status="success"}[7d]))
+          / sum(rate(butterfly_requests_total[7d]))) < 0.999
+        for: 15m
+        labels:
+          severity: critical
+          component: slo
+        annotations:
+          summary: "Availability SLO breach"
+          description: "7-day availability: {{ $value | humanizePercentage }} (SLO: 99.9%)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/slo-breach"
+
+      # SLO: P99 latency < 5s over 7 days
+      - alert: LatencySLOBreach
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(butterfly_request_duration_seconds_bucket[7d])) by (le)
+          ) > 5.0
+        for: 15m
+        labels:
+          severity: critical
+          component: slo
+        annotations:
+          summary: "Latency SLO breach"
+          description: "7-day P99 latency: {{ $value }}s (SLO: 5s)"
+          runbook_url: "https://docs.butterfly.ai/runbooks/latency-slo-breach"
