@@ -124,12 +124,15 @@ impl WorkAssigner {
         // Assign each layer to node with minimum load
         for layer in layers {
             // Find node with minimum current load
-            let (&min_node, _) = node_loads
+            // Note: This should always succeed since node_loads is initialized from nodes,
+            // but we handle it defensively to avoid panics
+            let min_node = node_loads
                 .iter()
                 .min_by(|(_, load1), (_, load2)| {
                     load1.partial_cmp(load2).unwrap_or(std::cmp::Ordering::Equal)
                 })
-                .unwrap();
+                .map(|(&node, _)| node)
+                .unwrap_or_else(|| nodes[0]); // Fallback to first node if somehow empty
 
             let assignment = assignments
                 .entry(min_node)
