@@ -1,0 +1,72 @@
+# Butterfly Rust Formatting Configuration
+# Optimized for distributed systems code readability
+
+edition = "2021"
+
+# Line width and wrapping
+max_width = 100
+comment_width = 80
+wrap_comments = true
+
+# Imports
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+reorder_modules = true
+
+# Code style
+fn_single_line = false
+where_single_line = false
+force_multiline_blocks = false
+match_arm_blocks = true
+match_block_trailing_comma = true
+newline_style = "Unix"
+
+# Formatting details
+use_small_heuristics = "Default"
+use_field_init_shorthand = true
+use_try_shorthand = true
+force_explicit_abi = true
+condense_wildcard_suffixes = true
+
+# Chains and indentation
+chain_width = 60
+indent_style = "Block"
+tab_spaces = 4
+
+# Attributes and derives
+normalize_comments = true
+normalize_doc_attributes = true
+format_code_in_doc_comments = true
+format_strings = true
+
+# Struct formatting
+struct_field_align_threshold = 0
+enum_discrim_align_threshold = 0
+
+# Control flow
+control_brace_style = "AlwaysSameLine"
+brace_style = "SameLineWhere"
+
+# Error handling
+overflow_delimited_expr = true
+
+# Trailing elements
+trailing_comma = "Vertical"
+trailing_semicolon = true
+
+# Blank lines
+blank_lines_upper_bound = 2
+blank_lines_lower_bound = 0
+
+# Macro formatting
+format_macro_matchers = true
+format_macro_bodies = true
+
+# Misc
+remove_nested_parens = true
+reorder_impl_items = true
+type_punctuation_density = "Wide"
+space_before_colon = false
+space_after_colon = true
+spaces_around_ranges = false

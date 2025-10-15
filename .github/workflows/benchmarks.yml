@@ -1,0 +1,343 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    # Run benchmarks weekly on Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Run criterion benchmarks
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for comparison
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: benchmarks
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install criterion dependencies
+        run: |
+          sudo apt-get install -y gnuplot
+
+      - name: Run benchmarks
+        run: cargo bench --workspace --all-features -- --output-format bencher | tee benchmark-output.txt
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'cargo'
+          output-file-path: benchmark-output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ github.ref == 'refs/heads/main' }}
+          # Show alert with commit comment on detecting possible performance regression
+          alert-threshold: '120%'
+          comment-on-alert: true
+          fail-on-alert: false
+          alert-comment-cc-users: '@tensorhusker'
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: target/criterion/
+          retention-days: 30
+
+  # Run benchmarks with profiling
+  profile-benchmarks:
+    name: Profile Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: profile-benchmarks
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install cargo-flamegraph
+        run: cargo install flamegraph
+
+      - name: Install perf
+        run: |
+          sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-`uname -r`
+
+      - name: Set perf permissions
+        run: |
+          sudo sh -c 'echo 1 >/proc/sys/kernel/perf_event_paranoid'
+          sudo sh -c 'echo 0 >/proc/sys/kernel/kptr_restrict'
+
+      - name: Run benchmarks with flamegraph
+        run: |
+          cargo flamegraph --bench butterfly_benchmarks -o flamegraph.svg || true
+
+      - name: Upload flamegraph
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: flamegraph
+          path: flamegraph.svg
+          retention-days: 30
+
+  # Compare benchmarks between branches
+  benchmark-compare:
+    name: Compare Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: benchmark-compare
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install critcmp
+        run: cargo install critcmp
+
+      - name: Run benchmarks on PR branch
+        run: |
+          cargo bench --workspace --all-features -- --save-baseline pr
+
+      - name: Checkout base branch
+        run: |
+          git checkout ${{ github.base_ref }}
+
+      - name: Run benchmarks on base branch
+        run: |
+          cargo bench --workspace --all-features -- --save-baseline base
+
+      - name: Compare benchmarks
+        run: |
+          critcmp base pr > comparison.txt || true
+          cat comparison.txt
+
+      - name: Comment PR with benchmark comparison
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comparison = fs.readFileSync('comparison.txt', 'utf8');
+
+            const body = `## Benchmark Comparison
+
+            Comparing \`${{ github.base_ref }}\` (base) with this PR:
+
+            \`\`\`
+            ${comparison}
+            \`\`\`
+
+            <details>
+            <summary>How to interpret these results</summary>
+
+            - **time**: Lower is better
+            - **thrpt**: Higher is better (throughput)
+            - **%**: Percentage change from base
+            - Values in \`[]\` are confidence intervals
+
+            </details>`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  # Memory profiling benchmarks
+  memory-benchmarks:
+    name: Memory Profiling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: memory-benchmarks
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install valgrind
+        run: |
+          sudo apt-get install -y valgrind
+
+      - name: Install cargo-valgrind
+        run: cargo install cargo-valgrind
+
+      - name: Run memory benchmarks
+        run: |
+          cargo valgrind bench --workspace || true
+
+      - name: Install heaptrack
+        run: |
+          sudo apt-get install -y heaptrack
+
+      - name: Profile heap usage
+        run: |
+          cargo build --release --workspace
+          heaptrack target/release/butterfly-cli --help || true
+
+      - name: Upload memory profiles
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: memory-profiles
+          path: heaptrack.*
+          retention-days: 7
+
+  # Compile-time benchmarks
+  compile-time:
+    name: Compile Time Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Clean build
+        run: cargo clean
+
+      - name: Measure clean build time
+        run: |
+          /usr/bin/time -v cargo build --workspace --all-features --release 2>&1 | tee compile-time.txt
+
+      - name: Measure incremental build time
+        run: |
+          touch crates/butterfly-core/src/lib.rs
+          /usr/bin/time -v cargo build --workspace --all-features --release 2>&1 | tee -a compile-time.txt
+
+      - name: Upload compile time results
+        uses: actions/upload-artifact@v3
+        with:
+          name: compile-time-results
+          path: compile-time.txt
+          retention-days: 30
+
+  # Binary size tracking
+  binary-size:
+    name: Binary Size Tracking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: binary-size
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Build release binaries
+        run: cargo build --workspace --release
+
+      - name: Measure binary sizes
+        run: |
+          echo "Binary sizes (stripped):" > binary-sizes.txt
+          du -h target/release/butterfly-cli >> binary-sizes.txt || true
+          echo "" >> binary-sizes.txt
+          echo "Detailed binary information:" >> binary-sizes.txt
+          ls -lh target/release/butterfly-cli >> binary-sizes.txt || true
+          cat binary-sizes.txt
+
+      - name: Install cargo-bloat
+        run: cargo install cargo-bloat
+
+      - name: Analyze binary bloat
+        run: |
+          cargo bloat --release -n 50 > binary-bloat.txt || true
+          cat binary-bloat.txt
+
+      - name: Upload binary size analysis
+        uses: actions/upload-artifact@v3
+        with:
+          name: binary-size-analysis
+          path: |
+            binary-sizes.txt
+            binary-bloat.txt
+          retention-days: 30
+
+      - name: Comment on PR with binary size
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const sizes = fs.readFileSync('binary-sizes.txt', 'utf8');
+            const bloat = fs.readFileSync('binary-bloat.txt', 'utf8');
+
+            const body = `## Binary Size Analysis
+
+            ### Size Information
+            \`\`\`
+            ${sizes}
+            \`\`\`
+
+            ### Top Space Consumers
+            \`\`\`
+            ${bloat}
+            \`\`\``;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

@@ -1,0 +1,225 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: "-D warnings --cfg docsrs"
+
+jobs:
+  # Build documentation
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-docs
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: docs
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Build documentation
+        run: |
+          cargo +nightly doc \
+            --workspace \
+            --all-features \
+            --no-deps \
+            --document-private-items
+
+      - name: Add redirect index.html
+        run: |
+          cat > target/doc/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=butterfly_core/index.html">
+              <title>Butterfly Documentation</title>
+            </head>
+            <body>
+              <p>Redirecting to <a href="butterfly_core/index.html">Butterfly documentation</a>...</p>
+            </body>
+          </html>
+          EOF
+
+      - name: Remove lock file
+        run: rm -f target/doc/.lock
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: target/doc/
+          retention-days: 7
+
+  # Check documentation examples
+  doc-tests:
+    name: Documentation Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: doc-tests
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Test documentation examples
+        run: cargo test --workspace --doc --all-features
+
+  # Deploy to GitHub Pages (only on main branch)
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [build-docs, doc-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download documentation artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: documentation
+          path: ./docs
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Check documentation coverage
+  doc-coverage:
+    name: Documentation Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: doc-coverage
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Check documentation coverage
+        run: |
+          cargo +nightly rustdoc \
+            --workspace \
+            --all-features \
+            -- \
+            -Z unstable-options \
+            --show-coverage
+
+  # Validate documentation links
+  doc-links:
+    name: Check Documentation Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: doc-links
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Check intra-doc links
+        run: |
+          cargo +nightly doc \
+            --workspace \
+            --all-features \
+            --no-deps
+
+  # Generate API documentation for external consumption
+  api-docs:
+    name: Generate API Documentation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: api-docs
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install cargo-readme
+        run: cargo install cargo-readme
+
+      - name: Generate README from lib.rs
+        run: |
+          for crate in crates/*/; do
+            if [ -f "$crate/src/lib.rs" ]; then
+              echo "Generating README for $crate"
+              cd "$crate"
+              cargo readme > README.md || true
+              cd ../..
+            fi
+          done
+
+      - name: Upload API docs
+        uses: actions/upload-artifact@v3
+        with:
+          name: api-documentation
+          path: crates/*/README.md
+          retention-days: 30

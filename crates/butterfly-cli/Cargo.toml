@@ -1,0 +1,17 @@
+[package]
+name = "butterfly-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "butterfly"
+path = "src/main.rs"
+
+[dependencies]
+butterfly-core = { path = "../butterfly-core" }
+butterfly-api = { path = "../butterfly-api" }
+butterfly-partition = { path = "../butterfly-partition" }
+butterfly-schedule = { path = "../butterfly-schedule" }
+butterfly-metrics = { path = "../butterfly-metrics" }
+clap = { version = "4.4", features = ["derive"] }
+tokio = { version = "1.35", features = ["full"] }

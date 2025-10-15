@@ -1,0 +1,1202 @@
+# Butterfly Configuration Schema
+# Complete annotated example with all configuration options
+# Version: 1.0.0
+# Last Updated: 2025-10-11
+
+# =============================================================================
+# METADATA SECTION
+# =============================================================================
+# Configuration metadata and versioning information
+
+[metadata]
+# Configuration schema version (MAJOR.MINOR.PATCH format)
+# Used for compatibility checking between nodes
+config_version = "1.0.0"
+
+# Deployment environment identifier
+# Options: "production", "staging", "development", "test"
+environment = "production"
+
+# Cluster name for multi-cluster deployments
+# Must be identical across all nodes in the same cluster
+cluster_name = "butterfly-main"
+
+# Optional: Configuration description
+description = "Production cluster configuration for distributed inference"
+
+# Optional: Contact information for cluster operator
+operator_email = "ops@example.com"
+
+# =============================================================================
+# INCLUDE DIRECTIVE
+# =============================================================================
+# Load additional configuration files and merge into this config
+# Files loaded in order, later files override earlier ones
+
+[include]
+# List of additional TOML files to include
+# Paths relative to this config file, or absolute paths
+files = [
+    # "./secrets.toml",        # Sensitive credentials (git-ignored)
+    # "./network-prod.toml",   # Environment-specific network config
+    # "./resources-gpu.toml",  # GPU-specific resource configuration
+]
+
+# =============================================================================
+# NODE SECTION
+# =============================================================================
+# Node-specific configuration (node-local settings)
+
+[node]
+# Unique node identifier (auto-generated UUID if omitted)
+# Must be unique across the cluster
+node_id = "node-001"
+
+# Node role in the cluster
+# Options: "coordinator", "compute", "observer"
+# - coordinator: Manages work distribution and aggregation
+# - compute: Executes model inference computations
+# - observer: Monitors cluster health (can be promoted to compute)
+role = "compute"
+
+# Data directory for persistent state
+# Stores model weights, checkpoints, and configuration history
+data_dir = "/var/lib/butterfly"
+
+# Log file directory
+log_dir = "/var/log/butterfly"
+
+# Temporary directory for scratch space
+temp_dir = "/tmp/butterfly"
+
+# Working directory (defaults to current directory)
+# work_dir = "/opt/butterfly"
+
+# =============================================================================
+# NETWORK SECTION
+# =============================================================================
+# Network communication settings (mix of cluster-wide and node-local)
+
+[network]
+# Communication protocol selection (cluster-wide)
+# Options: "quic" (recommended), "grpc", "tcp"
+# QUIC provides best performance and built-in encryption
+protocol = "quic"
+
+# Coordinator endpoint - all nodes must know this address (cluster-wide)
+# Format: "ip:port" or "hostname:port"
+coordinator_addr = "10.0.1.10:7890"
+
+# Node listening address (node-local)
+# Use "0.0.0.0" to listen on all interfaces
+listen_addr = "0.0.0.0:7890"
+
+# External address other nodes use to reach this node (node-local)
+# Required if node is behind NAT or load balancer
+external_addr = "10.0.1.11:7890"
+
+# Enable IPv6 support (node-local)
+ipv6_enabled = false
+
+# Bind to specific network interface (node-local, optional)
+# interface = "eth0"
+
+# -----------------------------------------------------------------------------
+# Connection Management
+# -----------------------------------------------------------------------------
+
+[network.connection]
+# Maximum concurrent connections this node accepts (node-local)
+max_connections = 1000
+
+# Maximum connections to a single peer (node-local)
+max_connections_per_peer = 10
+
+# Connection establishment timeout in milliseconds (cluster-wide)
+connection_timeout_ms = 5000
+
+# Idle connection timeout in milliseconds (cluster-wide)
+# Connections with no activity for this duration are closed
+idle_timeout_ms = 30000
+
+# TCP keepalive interval in milliseconds (cluster-wide)
+keepalive_interval_ms = 1000
+
+# Enable TCP_NODELAY (disable Nagle's algorithm) (cluster-wide)
+tcp_nodelay = true
+
+# Connection reuse pool size (node-local)
+connection_pool_size = 100
+
+# -----------------------------------------------------------------------------
+# Buffer Configuration
+# -----------------------------------------------------------------------------
+
+[network.buffers]
+# Send buffer size in bytes (node-local)
+# Larger buffers improve throughput on high-bandwidth networks
+# 4MB = 4194304 bytes
+send_buffer_bytes = 4194304
+
+# Receive buffer size in bytes (node-local)
+recv_buffer_bytes = 4194304
+
+# Maximum single message size in bytes (cluster-wide)
+# Must be large enough for largest tensor transfer
+# 100MB = 104857600 bytes
+max_message_size_bytes = 104857600
+
+# Stream buffer size for large transfers (node-local)
+stream_buffer_bytes = 1048576  # 1MB
+
+# -----------------------------------------------------------------------------
+# Compression
+# -----------------------------------------------------------------------------
+
+[network.compression]
+# Enable compression for network traffic (cluster-wide)
+enabled = true
+
+# Compression algorithm (cluster-wide)
+# Options: "none", "lz4", "zstd", "snappy"
+# - lz4: Fast compression, moderate ratio
+# - zstd: Best compression, configurable level
+# - snappy: Very fast, lower ratio
+algorithm = "zstd"
+
+# Compression level (cluster-wide)
+# zstd: 1-22 (3 is fast, 6 is balanced, 19+ is slow but high ratio)
+# lz4: 1-12
+level = 3
+
+# Minimum message size to compress in bytes (cluster-wide)
+# Small messages not worth compressing (CPU overhead > network savings)
+min_size_bytes = 1024
+
+# Compress tensor data (cluster-wide)
+compress_tensors = true
+
+# Compress checkpoints (cluster-wide)
+compress_checkpoints = true
+
+# -----------------------------------------------------------------------------
+# Retry and Backoff
+# -----------------------------------------------------------------------------
+
+[network.retry]
+# Maximum retry attempts for failed requests (cluster-wide)
+max_retries = 3
+
+# Initial backoff delay in milliseconds (cluster-wide)
+initial_backoff_ms = 100
+
+# Maximum backoff delay in milliseconds (cluster-wide)
+max_backoff_ms = 5000
+
+# Backoff multiplier (cluster-wide)
+# Exponential backoff: delay = min(initial * multiplier^attempt, max)
+backoff_multiplier = 2.0
+
+# Jitter factor to prevent thundering herd (cluster-wide)
+# Random jitter added: +/- (delay * jitter_factor)
+jitter_factor = 0.1
+
+# Retry on specific errors (cluster-wide)
+retry_on_connection_reset = true
+retry_on_timeout = true
+retry_on_unavailable = true
+
+# -----------------------------------------------------------------------------
+# Network Topology Hints
+# -----------------------------------------------------------------------------
+# Optional topology information for latency-aware scheduling
+
+[network.topology]
+# Datacenter identifier
+datacenter = "us-west-2a"
+
+# Rack identifier (for intra-DC placement)
+rack = "rack-7"
+
+# Availability zone
+availability_zone = "az1"
+
+# Network tier (for bandwidth hints)
+# Options: "high" (100Gbps+), "medium" (10-100Gbps), "low" (<10Gbps)
+network_tier = "high"
+
+# Expected latency to coordinator in milliseconds
+# Used for timeout calculations
+expected_latency_ms = 5
+
+# =============================================================================
+# BYZANTINE SECTION
+# =============================================================================
+# Byzantine fault tolerance and coordination parameters (cluster-wide critical)
+
+[byzantine]
+# Byzantine fault tolerance parameter (cluster-wide CRITICAL)
+# System tolerates up to f Byzantine (arbitrary) failures
+# Requires 2f+1 nodes minimum for consensus
+# f=1: Tolerates 1 Byzantine failure, requires 3+ nodes
+# f=2: Tolerates 2 Byzantine failures, requires 5+ nodes
+f_value = 1
+
+# Consensus timeout multiplier (cluster-wide)
+# Base timeouts are multiplied by this factor
+# Increase for high-latency networks
+timeout_multiplier = 1.0
+
+# -----------------------------------------------------------------------------
+# Failure Detection (Phi Accrual)
+# -----------------------------------------------------------------------------
+
+[byzantine.failure_detection]
+# Heartbeat interval in milliseconds (cluster-wide)
+# How often nodes send heartbeats to each other
+heartbeat_interval_ms = 100
+
+# Phi threshold for suspecting a node failed (cluster-wide)
+# Higher = more tolerant of slow nodes, lower = faster detection
+# Typical values: 8.0-12.0
+phi_suspect_threshold = 8.0
+
+# Phi threshold for declaring a node failed (cluster-wide)
+phi_failed_threshold = 12.0
+
+# Maximum heartbeat history to keep (node-local)
+# Used for statistical analysis of failure detection
+max_heartbeat_history = 1000
+
+# Adaptive heartbeat adjustment (cluster-wide)
+# Dynamically adjust interval based on network conditions
+adaptive_heartbeat = true
+
+# Minimum/maximum adaptive intervals (cluster-wide)
+min_heartbeat_interval_ms = 50
+max_heartbeat_interval_ms = 500
+
+# -----------------------------------------------------------------------------
+# Byzantine Agreement Protocol
+# -----------------------------------------------------------------------------
+
+[byzantine.agreement]
+# Agreement protocol variant (cluster-wide)
+# Options: "optimistic_pbft", "standard_pbft"
+# optimistic_pbft: Fast path for common case (1 RTT)
+# standard_pbft: Always use full protocol (3 RTT)
+protocol = "optimistic_pbft"
+
+# Pre-prepare phase timeout in milliseconds (cluster-wide)
+# Time coordinator waits for nodes to prepare
+pre_prepare_timeout_ms = 1000
+
+# Prepare phase timeout in milliseconds (cluster-wide)
+# Time nodes wait to collect prepare messages
+prepare_timeout_ms = 2000
+
+# Commit phase timeout in milliseconds (cluster-wide)
+# Time nodes wait to collect commit messages
+commit_timeout_ms = 3000
+
+# Maximum concurrent agreements (node-local)
+# Limits memory usage for in-flight consensus operations
+max_in_flight_agreements = 10
+
+# Fast path quorum size (cluster-wide)
+# Number of matching responses needed for optimistic fast path
+# Default: 2f+1 (all honest nodes)
+fast_path_quorum = 0  # 0 = auto (2f+1)
+
+# Enable speculative execution (cluster-wide)
+# Start executing before consensus completes (rollback if needed)
+speculative_execution = false
+
+# -----------------------------------------------------------------------------
+# Checkpointing
+# -----------------------------------------------------------------------------
+
+[byzantine.checkpoint]
+# Checkpoint interval in tokens (cluster-wide)
+# Create checkpoint every N tokens processed
+# Smaller = faster recovery, higher overhead
+# Typical values: 10-100
+interval_tokens = 10
+
+# Checkpoint interval in time (cluster-wide, alternative trigger)
+# Create checkpoint every N seconds regardless of tokens
+# interval_seconds = 60
+
+# Number of checkpoints to retain (node-local)
+# Keep last N checkpoints for rollback
+retention_count = 100
+
+# Compress checkpoints on disk (node-local)
+compression = true
+
+# Sync checkpoints to disk immediately (node-local)
+# true: Durable but slower, false: Faster but may lose checkpoint on crash
+sync_to_disk = true
+
+# Checkpoint storage directory (node-local)
+# Overrides node.data_dir if specified
+# checkpoint_dir = "/mnt/fast-ssd/checkpoints"
+
+# Garbage collect old checkpoints (node-local)
+gc_enabled = true
+gc_interval_seconds = 300  # Run GC every 5 minutes
+
+# -----------------------------------------------------------------------------
+# Reputation System
+# -----------------------------------------------------------------------------
+
+[byzantine.reputation]
+# Enable reputation tracking (cluster-wide)
+enabled = true
+
+# Initial reputation score for new nodes (cluster-wide)
+initial_score = 100.0
+
+# Reputation threshold for suspicion (cluster-wide)
+# Nodes below this score are monitored more closely
+suspect_threshold = 50.0
+
+# Reputation threshold for isolation (cluster-wide)
+# Nodes below this score are isolated from cluster
+isolate_threshold = 10.0
+
+# Reputation recovery rate (cluster-wide)
+# Points recovered per successful operation
+recovery_rate = 1.0
+
+# Reputation decay rate (cluster-wide)
+# Points lost per failed operation
+decay_rate = 5.0
+
+# Reputation for critical failures (cluster-wide)
+critical_failure_penalty = 25.0
+
+# Persist reputation scores (node-local)
+persist_scores = true
+
+# -----------------------------------------------------------------------------
+# View Change (Leader Re-election)
+# -----------------------------------------------------------------------------
+
+[byzantine.view_change]
+# View change timeout in milliseconds (cluster-wide)
+# Trigger new coordinator election if no progress
+timeout_ms = 10000
+
+# Maximum view change attempts before giving up (cluster-wide)
+max_view_change_attempts = 5
+
+# View change backoff multiplier (cluster-wide)
+backoff_multiplier = 1.5
+
+# =============================================================================
+# PARTITION SECTION
+# =============================================================================
+# Model partitioning strategy configuration (cluster-wide)
+
+[partition]
+# Partitioning strategy selection (cluster-wide)
+# Options:
+# - "layer_affinity": Group consecutive layers (minimize communication)
+# - "min_communication": Graph cut algorithms (minimize data transfer)
+# - "load_balanced": Even compute distribution
+# - "custom": User-provided partitioning
+strategy = "layer_affinity"
+
+# Enable dynamic repartitioning (cluster-wide)
+# Automatically rebalance partitions based on load
+dynamic_repartitioning = true
+
+# Partition cache size (node-local)
+# Cache partition assignments to avoid recomputation
+cache_size = 100
+
+# -----------------------------------------------------------------------------
+# Layer Affinity Strategy
+# -----------------------------------------------------------------------------
+
+[partition.layer_affinity]
+# Minimum layers per partition (cluster-wide)
+min_layers_per_partition = 2
+
+# Maximum layers per partition (cluster-wide)
+max_layers_per_partition = 10
+
+# Prefer partitioning at attention layer boundaries (cluster-wide)
+# Attention layers are natural partition points
+prefer_attention_boundaries = true
+
+# Prefer partitioning at residual connection boundaries (cluster-wide)
+prefer_residual_boundaries = true
+
+# Layer grouping strategy (cluster-wide)
+# Options: "sequential", "interleaved", "optimized"
+grouping_strategy = "sequential"
+
+# -----------------------------------------------------------------------------
+# Min Communication Strategy
+# -----------------------------------------------------------------------------
+
+[partition.min_communication]
+# Graph partitioning algorithm (cluster-wide)
+# Options: "kernighan_lin", "spectral", "metis", "kahip"
+algorithm = "kernighan_lin"
+
+# Load balance tolerance (cluster-wide)
+# Allow this much imbalance to reduce communication
+# 0.15 = 15% imbalance acceptable
+balance_tolerance = 0.15
+
+# Communication cost metric (cluster-wide)
+# Options: "volume" (bytes), "count" (messages), "latency" (time)
+cost_metric = "volume"
+
+# Edge weight calculation (cluster-wide)
+# Options: "tensor_size", "tensor_size_with_frequency", "constant"
+edge_weight = "tensor_size"
+
+# Maximum iterations for iterative algorithms (cluster-wide)
+max_iterations = 100
+
+# -----------------------------------------------------------------------------
+# Load Balanced Strategy
+# -----------------------------------------------------------------------------
+
+[partition.load_balanced]
+# Load balancing metric (cluster-wide)
+# Options: "flops" (floating point operations), "memory", "latency"
+metric = "flops"
+
+# Rebalance threshold (cluster-wide)
+# Rebalance if load imbalance exceeds this fraction
+rebalance_threshold = 0.20  # 20% imbalance
+
+# Rebalance hysteresis (cluster-wide)
+# Only rebalance if improvement exceeds this threshold
+hysteresis = 0.05  # 5% improvement required
+
+# Consider node capacity (cluster-wide)
+# Weight partitions by available node resources
+capacity_aware = true
+
+# -----------------------------------------------------------------------------
+# Model-Specific Hints
+# -----------------------------------------------------------------------------
+
+[partition.model_hints]
+# Override automatic partitioning for specific models (cluster-wide)
+# Format: "model_name" = { strategy = "...", param = value, ... }
+
+# Example: LLaMA 70B optimized partitioning
+# "llama-70b" = { strategy = "layer_affinity", layers_per_node = 8 }
+
+# Example: GPT-3 style model
+# "gpt3-175b" = { strategy = "min_communication", balance_tolerance = 0.10 }
+
+# -----------------------------------------------------------------------------
+# Dynamic Repartitioning
+# -----------------------------------------------------------------------------
+
+[partition.dynamic]
+# Enable dynamic repartitioning at runtime (cluster-wide)
+enabled = true
+
+# Rebalance check interval in seconds (cluster-wide)
+rebalance_interval_secs = 300  # Check every 5 minutes
+
+# Rebalance cost threshold (cluster-wide)
+# Only rebalance if expected improvement exceeds this fraction
+cost_threshold = 0.10  # 10% improvement required
+
+# Maximum migrations per rebalance interval (cluster-wide)
+# Limit churn to avoid overwhelming network
+max_migrations_per_interval = 2
+
+# Migration strategy (cluster-wide)
+# Options: "gradual" (slow rollout), "immediate" (all at once)
+migration_strategy = "gradual"
+
+# Enable proactive rebalancing (cluster-wide)
+# Anticipate load changes and rebalance preemptively
+proactive = false
+
+# =============================================================================
+# SCHEDULING SECTION
+# =============================================================================
+# Workload scheduling and load balancing (cluster-wide)
+
+[scheduling]
+# Scheduling policy (cluster-wide)
+# Options: "round_robin", "least_loaded", "predictive", "custom"
+# - round_robin: Simple fair distribution
+# - least_loaded: Assign to node with most available capacity
+# - predictive: Use historical data to predict best assignment
+policy = "predictive"
+
+# Enable adaptive scheduling (cluster-wide)
+# Learn from past assignments to improve future ones
+adaptive = true
+
+# -----------------------------------------------------------------------------
+# Queue Management
+# -----------------------------------------------------------------------------
+
+[scheduling.queues]
+# Maximum queue depth per node (node-local)
+# Reject new requests if queue exceeds this depth
+max_queue_depth = 100
+
+# Number of priority levels (cluster-wide)
+# Higher priority requests processed first
+# 1 = no priorities, 3 = low/medium/high, 5 = fine-grained
+priority_levels = 3
+
+# Request timeout in queue in milliseconds (cluster-wide)
+# Requests exceeding this timeout are dropped
+queue_timeout_ms = 60000  # 1 minute
+
+# Backpressure threshold as percentage (node-local)
+# Start applying backpressure when queue reaches this percentage
+backpressure_threshold = 80  # 80% full
+
+# Backpressure strategy (cluster-wide)
+# Options: "reject" (drop new requests), "slow" (slow down producer)
+backpressure_strategy = "slow"
+
+# Per-client queue limits (cluster-wide)
+# Prevent single client from monopolizing queue
+per_client_max_queue = 10
+
+# -----------------------------------------------------------------------------
+# Straggler Mitigation
+# -----------------------------------------------------------------------------
+
+[scheduling.stragglers]
+# Enable straggler detection (cluster-wide)
+detection_enabled = true
+
+# Enable speculative execution for stragglers (cluster-wide)
+# Duplicate work to backup node if straggler detected
+speculative_execution = true
+
+# Straggler threshold (cluster-wide)
+# Consider node a straggler if progress < threshold * expected_progress
+straggler_threshold = 0.5  # 50% of expected progress
+
+# Time before triggering speculation in milliseconds (cluster-wide)
+speculation_trigger_ms = 2000
+
+# Maximum concurrent speculative executions (cluster-wide)
+# Limit to avoid overloading backup nodes
+max_speculative_tasks = 5
+
+# Straggler history window (node-local)
+# Track straggler patterns over last N requests
+history_window = 100
+
+# -----------------------------------------------------------------------------
+# Pipeline Parallelism
+# -----------------------------------------------------------------------------
+
+[scheduling.pipeline]
+# Enable pipeline parallelism (cluster-wide)
+# Overlap execution of multiple batches
+enabled = true
+
+# Maximum concurrent batches in pipeline (cluster-wide)
+# Higher = more throughput, more memory
+max_concurrent_batches = 4
+
+# Batch size for inference (cluster-wide)
+batch_size = 8
+
+# Prefetch inputs for next batch (node-local)
+# Overlap data transfer with computation
+prefetch_inputs = true
+
+# Pipeline depth (cluster-wide)
+# Number of pipeline stages
+# 0 = auto-detect from model architecture
+pipeline_depth = 0
+
+# -----------------------------------------------------------------------------
+# Work Assignment
+# -----------------------------------------------------------------------------
+
+[scheduling.assignment]
+# Enable affinity scheduling (cluster-wide)
+# Prefer assigning work to nodes that already have model loaded
+affinity_enabled = true
+
+# Locality weight (cluster-wide)
+# Balance between locality (0.0) and load (1.0)
+# 0.7 = prefer locality, but avoid overloading
+locality_weight = 0.7
+
+# Shuffle assignment on failure (cluster-wide)
+# Randomize assignment to avoid repeatedly hitting failed node
+shuffle_on_failure = true
+
+# Sticky assignment per client (cluster-wide)
+# Route requests from same client to same node (for caching)
+sticky_assignment = false
+
+# Assignment cache TTL in seconds (node-local)
+assignment_cache_ttl = 60
+
+# =============================================================================
+# RESOURCES SECTION
+# =============================================================================
+# Resource limits and allocation (node-local)
+
+[resources]
+# Resource limit enforcement (node-local)
+# Options: "soft" (warn), "hard" (reject), "none" (no limits)
+enforcement = "hard"
+
+# Resource reservation percentage (node-local)
+# Reserve this percentage of resources for system overhead
+reservation_percent = 10.0
+
+# -----------------------------------------------------------------------------
+# Memory Limits
+# -----------------------------------------------------------------------------
+
+[resources.memory]
+# Maximum total memory usage in bytes (node-local)
+# 32GB = 34359738368 bytes
+max_total_bytes = 34359738368
+
+# Maximum memory for model weights in bytes (node-local)
+# 25GB = 26843545600 bytes
+max_model_bytes = 26843545600
+
+# Maximum memory for activations in bytes (node-local)
+# 4GB = 4294967296 bytes
+max_activation_bytes = 4294967296
+
+# Maximum memory for checkpoints in bytes (node-local)
+# 3GB = 3221225472 bytes
+max_checkpoint_bytes = 3221225472
+
+# Out-of-memory reserve in bytes (node-local)
+# Reserve memory for handling OOM situations gracefully
+# 512MB = 536870912 bytes
+oom_reserve_bytes = 536870912
+
+# Enable memory pooling (node-local)
+# Reuse allocated memory across requests
+pooling_enabled = true
+
+# Memory pool sizes (node-local)
+small_pool_size = 100  # Allocations < 1MB
+large_pool_size = 20   # Allocations > 1MB
+
+# Enable huge pages (node-local, requires system support)
+huge_pages = false
+
+# Memory prefaulting (node-local)
+# Touch all pages at allocation time (avoid page faults during inference)
+prefault = true
+
+# -----------------------------------------------------------------------------
+# CPU Allocation
+# -----------------------------------------------------------------------------
+
+[resources.cpu]
+# Number of worker threads (node-local)
+# 0 = auto-detect (use physical core count)
+worker_threads = 0
+
+# Maximum CPU utilization percentage (node-local)
+max_cpu_percent = 90.0
+
+# Enable CPU affinity (node-local)
+# Pin threads to specific CPU cores
+affinity_enabled = true
+
+# NUMA awareness (node-local)
+# Optimize memory allocation for NUMA architectures
+numa_aware = true
+
+# CPU priority (node-local)
+# Options: "normal", "high", "realtime"
+# realtime requires elevated privileges
+priority = "normal"
+
+# Enable turbo boost (node-local, x86-specific)
+# Allow CPU to exceed base frequency
+turbo_boost = true
+
+# -----------------------------------------------------------------------------
+# GPU Configuration
+# -----------------------------------------------------------------------------
+
+[resources.gpu]
+# Enable GPU acceleration (node-local)
+enabled = false
+
+# GPU device IDs to use (node-local)
+# List of GPU indices, e.g., [0, 1] for first two GPUs
+device_ids = [0]
+
+# GPU memory fraction to use (node-local)
+# 0.9 = use 90% of GPU memory, reserve 10% for system
+memory_fraction = 0.9
+
+# Enable tensor cores (node-local, NVIDIA-specific)
+# Use specialized hardware for matrix operations
+tensor_cores = true
+
+# Enable mixed precision (node-local)
+# Use FP16 or BF16 for faster computation
+mixed_precision = true
+
+# Mixed precision dtype (node-local)
+# Options: "fp16", "bf16"
+mixed_precision_dtype = "bf16"
+
+# CUDA streams per GPU (node-local)
+# More streams = more concurrency
+cuda_streams = 4
+
+# Enable CUDA graphs (node-local)
+# Capture computation graph for faster repeated execution
+cuda_graphs = true
+
+# GPU memory pool (node-local)
+# Pre-allocate memory pool to avoid allocation overhead
+memory_pool_enabled = true
+
+# -----------------------------------------------------------------------------
+# Disk I/O
+# -----------------------------------------------------------------------------
+
+[resources.disk]
+# Maximum read bandwidth in MB/s (node-local)
+max_read_mbps = 1000
+
+# Maximum write bandwidth in MB/s (node-local)
+max_write_mbps = 500
+
+# Disk cache size in bytes (node-local)
+# 10GB = 10737418240 bytes
+cache_size_bytes = 10737418240
+
+# Enable prefetching (node-local)
+# Anticipate disk reads and prefetch data
+prefetch_enabled = true
+
+# I/O scheduler (node-local, Linux-specific)
+# Options: "cfq", "deadline", "noop", "bfq"
+# io_scheduler = "deadline"
+
+# Direct I/O (node-local)
+# Bypass OS page cache for large transfers
+direct_io = false
+
+# -----------------------------------------------------------------------------
+# Rate Limiting
+# -----------------------------------------------------------------------------
+
+[resources.rate_limits]
+# Maximum inference requests per second (node-local)
+max_requests_per_sec = 100
+
+# Maximum tokens processed per second (node-local)
+max_tokens_per_sec = 10000
+
+# Burst multiplier (node-local)
+# Allow bursts up to this multiple of base rate
+burst_multiplier = 2.0
+
+# Rate limit algorithm (node-local)
+# Options: "token_bucket", "leaky_bucket", "fixed_window"
+algorithm = "token_bucket"
+
+# Per-client rate limits (node-local)
+per_client_enabled = true
+per_client_requests_per_sec = 10
+
+# =============================================================================
+# OBSERVABILITY SECTION
+# =============================================================================
+# Metrics, logging, and distributed tracing
+
+# -----------------------------------------------------------------------------
+# Logging Configuration
+# -----------------------------------------------------------------------------
+
+[observability.logging]
+# Log level (node-local)
+# Options: "trace", "debug", "info", "warn", "error"
+level = "info"
+
+# Log format (node-local)
+# Options: "json" (machine-readable), "text" (human-readable), "pretty" (colored text)
+format = "json"
+
+# Log output destination (node-local)
+# Options: "stdout", "stderr", "file", "syslog"
+output = "file"
+
+# Log file path (node-local, if output = "file")
+file_path = "/var/log/butterfly/butterfly.log"
+
+# Log rotation policy (node-local)
+# Options: "daily", "hourly", "size", "never"
+rotation = "daily"
+
+# Maximum log file size in MB (node-local, if rotation = "size")
+max_file_size_mb = 100
+
+# Maximum number of rotated log files to keep (node-local)
+max_files = 30
+
+# Include source code location in logs (node-local)
+# File name, line number, and module path
+include_source_location = true
+
+# Include thread ID in logs (node-local)
+include_thread_id = false
+
+# Include span context for distributed tracing (node-local)
+include_span_context = true
+
+# Log sampling rate (node-local)
+# 1.0 = log everything, 0.1 = log 10% (for high-volume logs)
+sampling_rate = 1.0
+
+# -----------------------------------------------------------------------------
+# Log Filtering
+# -----------------------------------------------------------------------------
+# Override log level for specific modules (node-local)
+
+[observability.logging.filters]
+# Example: Enable debug logging for communication module
+"butterfly_comm" = "debug"
+
+# Example: Enable trace logging for coordination protocol
+"butterfly_coordination" = "trace"
+
+# Example: Suppress verbose library logs
+"tokio_util" = "warn"
+"hyper" = "warn"
+
+# -----------------------------------------------------------------------------
+# Metrics Collection
+# -----------------------------------------------------------------------------
+
+[observability.metrics]
+# Enable metrics collection (node-local)
+enabled = true
+
+# Metrics exporter (node-local)
+# Options: "prometheus", "influxdb", "otlp", "custom"
+exporter = "prometheus"
+
+# Metrics export interval in seconds (cluster-wide)
+export_interval_secs = 15
+
+# Prometheus metrics endpoint (node-local)
+listen_addr = "0.0.0.0:9090"
+
+# Metrics prefix (cluster-wide)
+# Prepended to all metric names
+prefix = "butterfly"
+
+# Include hostname in metrics (node-local)
+include_hostname = true
+
+# Include node_id in metrics (node-local)
+include_node_id = true
+
+# -----------------------------------------------------------------------------
+# Histogram Configuration
+# -----------------------------------------------------------------------------
+
+[observability.metrics.histograms]
+# Histogram buckets for request latency in milliseconds (cluster-wide)
+request_latency_ms = [1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0]
+
+# Histogram buckets for computation time in milliseconds (cluster-wide)
+compute_latency_ms = [10.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2000.0, 5000.0]
+
+# Histogram buckets for message size in bytes (cluster-wide)
+message_size_bytes = [1024, 10240, 102400, 1048576, 10485760, 104857600]
+
+# Histogram buckets for queue depth (cluster-wide)
+queue_depth = [1, 5, 10, 25, 50, 100, 250, 500]
+
+# -----------------------------------------------------------------------------
+# Metrics Collection Toggles
+# -----------------------------------------------------------------------------
+
+[observability.metrics.collection]
+# System resource metrics (CPU, memory, disk, network) (node-local)
+system_resources = true
+
+# Network I/O metrics (bytes sent/received, connections) (node-local)
+network_io = true
+
+# Inference latency and throughput metrics (node-local)
+inference_latency = true
+
+# Queue depth and backpressure metrics (node-local)
+queue_depths = true
+
+# Byzantine protocol events (consensus rounds, failures) (node-local)
+byzantine_events = true
+
+# Partition assignment metrics (node-local)
+partition_metrics = true
+
+# Model loading metrics (node-local)
+model_loading = true
+
+# Per-layer computation metrics (node-local, verbose)
+per_layer_metrics = false
+
+# -----------------------------------------------------------------------------
+# Distributed Tracing
+# -----------------------------------------------------------------------------
+
+[observability.tracing]
+# Enable distributed tracing (node-local)
+enabled = true
+
+# Tracing exporter (node-local)
+# Options: "jaeger", "zipkin", "otlp"
+exporter = "jaeger"
+
+# Tracing backend endpoint (node-local)
+endpoint = "http://localhost:14268/api/traces"
+
+# Sampling rate (node-local)
+# 0.1 = sample 10% of requests (reduce overhead)
+# 1.0 = sample all requests (development)
+sampling_rate = 0.1
+
+# Include baggage in spans (node-local)
+# Propagate additional context across service boundaries
+include_baggage = true
+
+# Maximum span attributes (node-local)
+max_attributes = 32
+
+# Maximum span events (node-local)
+max_events = 128
+
+# Export timeout in milliseconds (node-local)
+export_timeout_ms = 5000
+
+# -----------------------------------------------------------------------------
+# Profiling (Development/Debugging)
+# -----------------------------------------------------------------------------
+
+[observability.profiling]
+# Enable profiling (node-local)
+# WARNING: Significant performance overhead, development only
+enabled = false
+
+# Enable CPU profiling (node-local)
+cpu_profiling = false
+
+# CPU profile sampling rate in Hz (node-local)
+cpu_sample_rate_hz = 100
+
+# Enable memory profiling (node-local)
+memory_profiling = false
+
+# Memory profile sampling rate (node-local)
+# 1 = sample every allocation (slow), 1000 = sample 1/1000 allocations
+memory_sample_rate = 1000
+
+# Flamegraph output path (node-local)
+flamegraph_output = "/tmp/butterfly-profile.svg"
+
+# Profile duration in seconds (node-local)
+# 0 = run until manually stopped
+profile_duration_secs = 60
+
+# =============================================================================
+# SECURITY SECTION
+# =============================================================================
+# Authentication, encryption, and access control
+
+# -----------------------------------------------------------------------------
+# TLS/mTLS Configuration
+# -----------------------------------------------------------------------------
+
+[security.tls]
+# Enable TLS encryption (cluster-wide)
+enabled = true
+
+# Path to TLS certificate file (node-local)
+cert_file = "/etc/butterfly/certs/node.crt"
+
+# Path to TLS private key file (node-local)
+key_file = "/etc/butterfly/certs/node.key"
+
+# Path to CA certificate file (cluster-wide)
+ca_file = "/etc/butterfly/certs/ca.crt"
+
+# Require client certificates (mTLS) (cluster-wide)
+verify_client = true
+
+# Minimum TLS version (cluster-wide)
+# Options: "1.2", "1.3"
+min_tls_version = "1.3"
+
+# TLS cipher suites (cluster-wide)
+# Empty = use secure defaults
+cipher_suites = []
+
+# Enable TLS session resumption (node-local)
+session_resumption = true
+
+# TLS session ticket lifetime in seconds (node-local)
+session_ticket_lifetime_secs = 3600
+
+# -----------------------------------------------------------------------------
+# Cryptographic Signing
+# -----------------------------------------------------------------------------
+
+[security.signing]
+# Signing algorithm (cluster-wide)
+# Options: "ed25519", "ecdsa_p256", "rsa_2048"
+# ed25519 recommended for performance and security
+algorithm = "ed25519"
+
+# Path to signing private key (node-local)
+private_key_file = "/etc/butterfly/keys/signing.key"
+
+# Path to signing public key (node-local)
+public_key_file = "/etc/butterfly/keys/signing.pub"
+
+# Sign all messages (cluster-wide)
+# Cryptographically authenticate all inter-node messages
+sign_all_messages = true
+
+# Signature verification strictness (cluster-wide)
+# Options: "strict" (reject invalid), "warn" (log warning), "none" (no verification)
+verification = "strict"
+
+# -----------------------------------------------------------------------------
+# Access Control
+# -----------------------------------------------------------------------------
+
+[security.access_control]
+# Enable access control (cluster-wide)
+enabled = true
+
+# Access control policy (cluster-wide)
+# Options: "rbac" (role-based), "acl" (access control lists), "none"
+policy = "rbac"
+
+# Path to policy configuration file (cluster-wide)
+policy_file = "/etc/butterfly/policies/rbac.toml"
+
+# Default action when policy undefined (cluster-wide)
+# Options: "allow", "deny"
+default_action = "deny"
+
+# Enable audit logging for access decisions (node-local)
+audit_logging = true
+
+# -----------------------------------------------------------------------------
+# API Authentication
+# -----------------------------------------------------------------------------
+
+[security.api]
+# Require authentication for API requests (cluster-wide)
+require_auth = true
+
+# Authentication method (cluster-wide)
+# Options: "jwt", "api_key", "mtls", "none"
+auth_method = "jwt"
+
+# JWT secret file path (node-local, if auth_method = "jwt")
+jwt_secret_file = "/etc/butterfly/secrets/jwt.key"
+
+# JWT token expiry in seconds (cluster-wide)
+token_expiry_secs = 3600
+
+# JWT issuer (cluster-wide)
+jwt_issuer = "butterfly-cluster"
+
+# JWT audience (cluster-wide)
+jwt_audience = "butterfly-api"
+
+# API key file path (node-local, if auth_method = "api_key")
+# api_key_file = "/etc/butterfly/secrets/api_keys.toml"
+
+# Enable API rate limiting for security (node-local)
+rate_limiting = true
+
+# Maximum failed authentication attempts (node-local)
+max_failed_auth_attempts = 5
+
+# Lockout duration after max failures in seconds (node-local)
+lockout_duration_secs = 300  # 5 minutes
+
+# -----------------------------------------------------------------------------
+# Encryption at Rest
+# -----------------------------------------------------------------------------
+
+[security.encryption_at_rest]
+# Enable encryption for data at rest (node-local)
+enabled = false
+
+# Encryption algorithm (node-local)
+# Options: "aes-256-gcm", "chacha20-poly1305"
+algorithm = "aes-256-gcm"
+
+# Path to encryption key (node-local)
+# key_file = "/etc/butterfly/keys/encryption.key"
+
+# Encrypt checkpoints (node-local)
+encrypt_checkpoints = true
+
+# Encrypt model weights (node-local)
+encrypt_models = false
+
+# Encrypt logs (node-local)
+encrypt_logs = false
+
+# =============================================================================
+# ADVANCED SETTINGS
+# =============================================================================
+# Advanced tuning parameters (use with caution)
+
+[advanced]
+# Enable experimental features (cluster-wide)
+# WARNING: May be unstable
+experimental_features = false
+
+# Panic on unrecoverable errors (node-local)
+# false = attempt graceful degradation
+panic_on_error = false
+
+# Enable unsafe optimizations (node-local)
+# WARNING: May violate safety guarantees
+unsafe_optimizations = false
+
+# Custom allocator (node-local)
+# Options: "system", "jemalloc", "mimalloc"
+allocator = "system"
+
+# Stack size for worker threads in bytes (node-local)
+# 2MB = 2097152 bytes
+worker_stack_size_bytes = 2097152
+
+# Enable core dumps (node-local)
+enable_core_dumps = false
+
+# Core dump directory (node-local)
+# core_dump_dir = "/var/crash/butterfly"
