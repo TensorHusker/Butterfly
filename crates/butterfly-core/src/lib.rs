@@ -5,6 +5,9 @@
 
 pub mod tensor;
 pub mod state;
+pub mod graph;
+pub mod graph_io;
+pub mod bsp;
 
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +15,15 @@ pub use tensor::{TensorRef, TensorPool};
 pub use state::{
     SystemState, Phase, ComponentState, StateMachine, PersistentStateMachine,
     StateError, StateTransitionRecord, TransitionTrigger,
+};
+pub use graph::{
+    Graph, Vertex, Edge, Subgraph, VertexId, EdgeId, PartitionId,
+    VertexData, EdgeData, GraphMetadata, GraphBuilder,
+};
+pub use graph_io::{GraphLoader, ResultExporter, ExportFormat, IoError};
+pub use bsp::{
+    VertexCompute, Message, MessagePayload, MessageBuffer, ComputationResult,
+    SuperstepResult, AggregatedResult, ComputeError, MessageCombiner, SumCombiner,
 };
 
 /// Unique identifier for a node in the distributed system

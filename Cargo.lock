@@ -257,6 +257,7 @@ dependencies = [
 name = "butterfly-cli"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "butterfly-api",
  "butterfly-core",
  "butterfly-metrics",
@@ -307,9 +308,23 @@ dependencies = [
 name = "butterfly-core"
 version = "0.1.0"
 dependencies = [
+ "bincode",
+ "chrono",
  "parking_lot",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "butterfly-graph"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "butterfly-core",
+ "criterion",
+ "serde",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

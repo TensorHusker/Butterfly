@@ -1,10 +1,18 @@
 //! # Butterfly Partition
 //!
-//! Advanced model partitioning strategies for distributing neural network layers across nodes.
-//! Implements high-performance algorithms with computational cost modeling and topology awareness.
+//! Advanced partitioning strategies for distributing both neural network layers
+//! and graph vertices across nodes. Implements high-performance algorithms with
+//! computational cost modeling and topology awareness.
+
+pub mod graph;
 
 use butterfly_core::{LayerInfo, LayerType, ModelPartition, NodeId, PartitionStrategy};
 use std::collections::HashMap;
+
+pub use graph::{
+    GraphPartitioner, HashPartitioner, StreamPartitioner, METISPartitioner,
+    GraphPartitionQuality, PartitionError as GraphPartitionError,
+};
 
 /// Represents the computational capabilities of a node
 #[derive(Debug, Clone)]

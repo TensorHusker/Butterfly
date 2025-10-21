@@ -11,7 +11,11 @@ path = "src/main.rs"
 butterfly-core = { path = "../butterfly-core" }
 butterfly-api = { path = "../butterfly-api" }
 butterfly-partition = { path = "../butterfly-partition" }
+butterfly-graph = { path = "../butterfly-graph" }
 butterfly-schedule = { path = "../butterfly-schedule" }
 butterfly-metrics = { path = "../butterfly-metrics" }
 clap = { version = "4.4", features = ["derive"] }
 tokio = { version = "1.35", features = ["full"] }
+axum = "0.7"
+anyhow = "1.0"
+csv = "1.3"

@@ -9,6 +9,7 @@ members = [
     "crates/butterfly-api",
     "crates/butterfly-metrics",
     "crates/butterfly-cli",
+    "crates/butterfly-graph",
 ]
 
 [workspace.package]

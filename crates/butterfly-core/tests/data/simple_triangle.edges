@@ -1,0 +1,5 @@
+# Simple triangle graph (unweighted, directed)
+# 3 vertices, 3 edges forming a cycle
+1 2
+2 3
+3 1
