@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/butterfly-core",
     "crates/butterfly-comm",
+    "crates/butterfly-config",
     "crates/butterfly-coordination",
     "crates/butterfly-partition",
     "crates/butterfly-schedule",
@@ -51,6 +52,11 @@ opentelemetry = "0.21"
 
 # CLI
 clap = { version = "4.4", features = ["derive", "cargo"] }
+
+# ML Backend (ONNX Runtime)
+tract-onnx = "0.21"
+ndarray = "0.15"
+tokenizers = "0.19"
 
 # Utilities
 uuid = { version = "1.6", features = ["v4", "serde"] }

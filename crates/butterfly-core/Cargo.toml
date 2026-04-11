@@ -10,6 +10,14 @@ thiserror = "1.0"
 parking_lot = "0.12"
 chrono = { version = "0.4", features = ["serde"] }
 bincode = "1.3"
+async-trait = "0.1"
+tokio = { version = "1.35", features = ["full"] }
+
+# ML Backend (mock for now - ONNX will be added later)
+# tract-onnx = "0.21"
+# tract-core = "0.21"
+# ndarray = "0.15"
+# tokenizers = "0.19"
 
 [dev-dependencies]
 tempfile = "3.8"

@@ -1,96 +1,107 @@
 //! Hello Butterfly - A simple example demonstrating basic usage
 //!
 //! This example shows how to:
-//! 1. Initialize a Butterfly node
-//! 2. Submit a simple inference task
-//! 3. Retrieve and process results
+//! 1. Create a single worker node
+//! 2. Assign and execute work
+//! 3. Verify results
 //!
 //! Run with: cargo run --example hello_butterfly
 
+use butterfly_core::{NodeId, WorkerNode, WorkerConfig, DeviceType, ModelExecutor, WorkAssignment};
 use std::error::Error;
-
-// TODO: Import butterfly crate once available
-// use butterfly::{Node, Task, Config};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Initialize logging
-    env_logger::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
 
     println!("🦋 Welcome to Butterfly Distributed Inference!");
     println!("================================================\n");
 
-    // Step 1: Create a node configuration
-    println!("Step 1: Configuring node...");
-    // TODO: Implement node configuration
-    // let config = Config::builder()
-    //     .node_id("hello-node-1")
-    //     .listen_addr("127.0.0.1:8080")
-    //     .build()?;
+    // Step 1: Create worker configuration
+    println!("Step 1: Configuring worker node...");
+    let worker_config = WorkerConfig {
+        node_id: NodeId(1),
+        device: DeviceType::Cpu,
+        max_queue_size: 100,
+        barrier_timeout_secs: 30,
+        enable_byzantine: false,
+    };
+    println!("  ✓ Worker configured");
+    println!("    - Node ID: {:?}", worker_config.node_id);
+    println!("    - Device: {:?}", worker_config.device);
+    println!();
 
-    println!("  ✓ Node configured\n");
+    // Step 2: Create model executor
+    println!("Step 2: Loading model executor...");
+    let executor = ModelExecutor::new_test_model(DeviceType::Cpu)?;
+    println!("  ✓ Model executor loaded");
+    println!("    - Layers: {}", executor.num_layers());
+    println!("    - Input shape: {:?}", executor.input_shape());
+    println!();
 
-    // Step 2: Initialize the node
-    println!("Step 2: Initializing node...");
-    // TODO: Implement node initialization
-    // let node = Node::new(config).await?;
-    // node.start().await?;
+    // Step 3: Initialize worker
+    println!("Step 3: Initializing worker...");
+    let mut worker = WorkerNode::new(worker_config, executor);
+    worker.initialize()?;
+    println!("  ✓ Worker initialized and ready");
+    println!("    - State: {:?}", worker.get_state());
+    println!();
 
-    println!("  ✓ Node started and ready\n");
+    // Step 4: Create work assignment
+    println!("Step 4: Creating work assignment...");
+    let assignment = WorkAssignment {
+        assignment_id: 1,
+        layer_range: (0, 6),
+        input_data: vec![1.0; 7680], // Mock input tensor
+        expected_output_size: 7680,
+        superstep: 0,
+    };
+    println!("  ✓ Work assignment created");
+    println!("    - Assignment ID: {}", assignment.assignment_id);
+    println!("    - Layer range: {:?}", assignment.layer_range);
+    println!("    - Input size: {} elements", assignment.input_data.len());
+    println!();
 
-    // Step 3: Create a simple inference task
-    println!("Step 3: Creating inference task...");
-    // TODO: Implement task creation
-    // let task = Task::builder()
-    //     .input("Hello, Butterfly!")
-    //     .model("simple-echo")
-    //     .build()?;
+    // Step 5: Assign work to worker
+    println!("Step 5: Assigning work...");
+    worker.handle_work_assignment(assignment)?;
+    println!("  ✓ Work assigned");
+    println!("    - State: {:?}", worker.get_state());
+    println!();
 
-    println!("  ✓ Task created\n");
+    // Step 6: Execute computation
+    println!("Step 6: Executing computation...");
+    let result = worker.execute_assigned_work()?;
+    println!("  ✓ Computation completed");
+    println!("    - Execution time: {:.2}ms", result.execution_time_ms);
+    println!("    - Output size: {} elements", result.output_data.len());
+    println!("    - State: {:?}", worker.get_state());
+    println!();
 
-    // Step 4: Submit the task
-    println!("Step 4: Submitting task for inference...");
-    // TODO: Implement task submission
-    // let task_id = node.submit_task(task).await?;
-    // println!("  ✓ Task submitted with ID: {}\n", task_id);
-
-    // Step 5: Wait for results
-    println!("Step 5: Waiting for results...");
-    // TODO: Implement result retrieval
-    // let result = node.get_result(task_id).await?;
-    // println!("  ✓ Received result: {:?}\n", result);
-
-    // Step 6: Clean shutdown
-    println!("Step 6: Shutting down node...");
-    // TODO: Implement graceful shutdown
-    // node.shutdown().await?;
-    println!("  ✓ Node shutdown complete\n");
+    // Step 7: Verify result
+    println!("Step 7: Verifying result...");
+    assert_eq!(result.assignment_id, 1, "Assignment ID mismatch");
+    assert_eq!(result.output_data.len(), 7680, "Output size mismatch");
+    assert_eq!(result.node_id, NodeId(1), "Node ID mismatch");
+    println!("  ✓ Result verified successfully");
+    println!();
 
     println!("================================================");
     println!("🦋 Hello Butterfly example completed successfully!");
-
-    // Placeholder success for now
-    println!("\n[NOTE: This is a template. Actual implementation pending.]");
+    println!();
+    println!("What just happened:");
+    println!("  1. Created a worker node with CPU executor");
+    println!("  2. Assigned layers 0-6 for computation");
+    println!("  3. Executed inference on mock input data");
+    println!("  4. Verified output matches expectations");
+    println!();
+    println!("Next steps:");
+    println!("  - Try: cargo run --example distributed_inference");
+    println!("  - Read: docs/architecture.md");
+    println!("  - Explore: docs/coordination_protocol.md");
 
     Ok(())
-}
-
-/// Helper function to demonstrate error handling
-#[allow(dead_code)]
-fn demonstrate_error_handling() -> Result<(), Box<dyn Error>> {
-    // Example of proper error handling patterns
-    // TODO: Add actual error scenarios once APIs are available
-    Ok(())
-}
-
-/// Helper function to show configuration options
-#[allow(dead_code)]
-fn show_configuration_options() {
-    println!("Available configuration options:");
-    println!("  - node_id: Unique identifier for this node");
-    println!("  - listen_addr: Address to listen for connections");
-    println!("  - peer_addrs: Addresses of peer nodes");
-    println!("  - model_path: Path to model weights");
-    println!("  - batch_size: Batch size for inference");
-    println!("  - timeout: Task timeout duration");
 }

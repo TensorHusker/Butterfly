@@ -3,8 +3,14 @@
 //! Network communication layer for the Butterfly distributed inference system.
 //! Handles peer-to-peer messaging, tensor transfers, and node coordination.
 
+pub mod serialization;
+pub mod tcp;
+
 use butterfly_core::NodeId;
 use serde::{Deserialize, Serialize};
+
+// Re-exports
+pub use tcp::TcpBackend;
 
 /// Message types exchanged between nodes in the distributed system
 #[derive(Debug, Clone, Serialize, Deserialize)]

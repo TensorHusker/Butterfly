@@ -18,6 +18,7 @@ pub mod failure_detector;
 pub mod state_machine;
 pub mod types;
 pub mod work_assignment;
+pub mod runtime;
 
 pub use agreement::ByzantineAgreement;
 pub use barrier::BarrierCoordinator;
@@ -26,6 +27,7 @@ pub use failure_detector::PhiAccrualFailureDetector;
 pub use state_machine::{CoordinationStateMachine, NodeState, Phase};
 pub use types::{CoordinationMessage, CoordinationError, Proof, WorkAssignment};
 pub use work_assignment::WorkAssigner;
+pub use runtime::{CoordinationRuntime, RuntimeConfig};
 
 use butterfly_core::NodeId;
 use std::sync::Arc;

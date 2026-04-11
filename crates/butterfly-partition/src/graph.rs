@@ -472,7 +472,7 @@ impl METISPartitioner {
                 (dst_super, src_super)
             };
 
-            let weight = edge.weight.unwrap_or(1.0);
+            let weight = edge.data.weight;
             *edge_weights.entry(edge_key).or_insert(0.0) += weight;
         }
 
@@ -481,7 +481,7 @@ impl METISPartitioner {
         for ((src, dst), weight) in edge_weights {
             let mut edge = Edge::new(EdgeId(edge_id_counter), src, dst);
             edge_id_counter += 1;
-            edge.weight = Some(weight);
+            edge.data.weight = weight;
             new_graph.add_edge(edge);
         }
 
@@ -498,7 +498,7 @@ impl METISPartitioner {
         for (edge_id, edge) in &graph.edges {
             if (edge.source == src && edge.target == dst) ||
                (!graph.metadata.directed && edge.source == dst && edge.target == src) {
-                total_weight += edge.weight.unwrap_or(1.0);
+                total_weight += edge.data.weight;
             }
         }
 

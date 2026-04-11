@@ -8,6 +8,8 @@ pub mod state;
 pub mod graph;
 pub mod graph_io;
 pub mod bsp;
+pub mod executor;
+pub mod worker;
 
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +26,13 @@ pub use graph_io::{GraphLoader, ResultExporter, ExportFormat, IoError};
 pub use bsp::{
     VertexCompute, Message, MessagePayload, MessageBuffer, ComputationResult,
     SuperstepResult, AggregatedResult, ComputeError, MessageCombiner, SumCombiner,
+};
+pub use executor::{
+    ModelExecutor, DeviceType, ExecutorError, tensor_to_vec, vec_to_tensor,
+};
+pub use worker::{
+    WorkerNode, WorkerState, WorkerConfig, WorkerError,
+    WorkAssignment, WorkResult, Vote, BarrierCheckpoint,
 };
 
 /// Unique identifier for a node in the distributed system

@@ -1,0 +1,75 @@
+# Butterfly Distributed Inference Configuration
+# This is the default configuration file
+
+[metadata]
+version = "0.1.0"
+environment = "development"
+
+[network]
+protocol = "tcp"
+bind_address = "0.0.0.0:8080"
+max_connections = 1000
+compression = "adaptive"
+connection_timeout_secs = 30
+
+[byzantine]
+# Number of Byzantine faults to tolerate
+# Requires 2f+1 total nodes (e.g., f=1 needs 3 nodes minimum)
+fault_tolerance_level = 1
+
+# How often to create checkpoints (seconds)
+checkpoint_interval_secs = 60
+
+# Reputation decay factor (0.0-1.0)
+# Lower = faster decay of reputation scores
+reputation_decay = 0.95
+
+# Maximum number of checkpoints to retain
+max_checkpoints = 10
+
+[partition]
+# Strategies: uniform, load-balanced, topology-aware, tensor-parallel, pipeline-parallel
+strategy = "load-balanced"
+
+# Automatic rebalancing interval in seconds (0 = disabled)
+rebalance_interval_secs = 300
+
+[scheduling]
+# Policies: fifo, priority, batch-aware
+policy = "fifo"
+
+# Maximum queue size
+queue_size = 10000
+
+# Enable batch processing
+enable_batching = false
+
+# Maximum batch size (if batching enabled)
+max_batch_size = 16
+
+[resources]
+# Memory limit in GB (0 = unlimited)
+memory_limit_gb = 0
+
+# Fraction of GPU memory to use (0.0-1.0)
+gpu_memory_fraction = 0.9
+
+# Enable CPU affinity pinning
+enable_cpu_affinity = false
+
+[observability]
+# Metrics collection interval (seconds)
+metrics_interval_secs = 15
+
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+# Distributed tracing sample rate (0.0-1.0)
+# 0.01 = sample 1% of requests
+tracing_sample_rate = 0.01
+
+# Enable Prometheus metrics endpoint
+enable_prometheus = true
+
+# Prometheus metrics endpoint
+prometheus_endpoint = "0.0.0.0:9090"
